@@ -4,26 +4,26 @@
   // Setup project configuration variables
   if (!window.config) {
     window.config = {};
+
+    config.CANVAS_WIDTH;
+    config.CANVAS_HEIGHT;
+    config.MAX_VELOCITY = 6;
+    config.MIN_VELOCITY = 2;
+    config.NUM_BOIDS = 5;
   }
 
   var canvas;
   var boids = [];
 
-  var CANVAS_WIDTH;
-  var CANVAS_HEIGHT;
-  var MAX_VELOCITY = 15;
-  var maxstep = 200;
-  var curstep = 0;
-
   function init() {
     canvas = $("#canvas");
-    CANVAS_WIDTH = canvas.width();
-    CANVAS_HEIGHT = canvas.height();
+    config.CANVAS_WIDTH = canvas.width();
+    config.CANVAS_HEIGHT = canvas.height();
 
     window.onresize();
 
     // Add boids
-    for (var i = 0; i < 50; i++) {
+    for (var i = 0; i < config.NUM_BOIDS; i++) {
       addBoid();
     }
 
@@ -37,10 +37,9 @@
   function addBoid() {
     boids.push(
       new Boid(
-        400,250,
-        // Math.round(Math.random() * CANVAS_WIDTH),
-        // Math.round(Math.random() * CANVAS_HEIGHT),
-        Math.round(Math.random() * MAX_VELOCITY),
+        Math.round(Math.random() * config.CANVAS_WIDTH),
+        Math.round(Math.random() * config.CANVAS_HEIGHT),
+        getRandomInt(config.MIN_VELOCITY, config.MAX_VELOCITY),
         Math.round(Math.random() * 360)));
   }
 
@@ -49,23 +48,14 @@
   }
 
   function step() {
-    curstep++;
-    if (curstep > maxstep) {
-      boids = [];
-      for (var i = 0; i < 50; i++) {
-        addBoid();
-      }
-      curstep = 0;
-      var context = getHtmlCanvas().getContext("2d");
-      context.beginPath();
-      context.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
-    }
+    var canvas_context = getHtmlCanvas().getContext("2d");
+    canvas_context.beginPath();
+    canvas_context.clearRect(0, 0, config.CANVAS_WIDTH, config.CANVAS_HEIGHT);
 
     for (var i = 0; i < boids.length; i++) {
       boids[i].step();
     }
 
-    var canvas_context = getHtmlCanvas().getContext("2d");
     for (var i = 0; i < boids.length; i++) {
       boids[i].draw(canvas_context);
     }
@@ -81,4 +71,10 @@
   Math.radians = function(degrees) {
     return degrees * Math.PI / 180;
   };
+
+  function getRandomInt(min, max) {
+    min = Math.ceil(min);
+    max = Math.floor(max);
+    return Math.floor(Math.random() * (max - min)) + min;
+  }
 })();

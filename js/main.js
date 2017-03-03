@@ -7,9 +7,12 @@
 
     config.CANVAS_WIDTH;
     config.CANVAS_HEIGHT;
-    config.MAX_VELOCITY = 6;
-    config.MIN_VELOCITY = 2;
-    config.NUM_BOIDS = 5;
+    config.MAX_VELOCITY = 2;
+    config.MIN_VELOCITY = 1;
+    config.NUM_BOIDS = 15;
+    config.LOCAL_BOUNDS = 50;
+
+    config.uid = 0; 
   }
 
   var canvas;
@@ -53,9 +56,10 @@
     canvas_context.clearRect(0, 0, config.CANVAS_WIDTH, config.CANVAS_HEIGHT);
 
     for (var i = 0; i < boids.length; i++) {
-      boids[i].step();
+      boids[i].step(boids);
     }
 
+    canvas_context.fillStyle = "#fff";
     for (var i = 0; i < boids.length; i++) {
       boids[i].draw(canvas_context);
     }

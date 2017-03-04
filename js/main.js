@@ -9,26 +9,41 @@
     config.CANVAS_HEIGHT;
     config.MAX_VELOCITY = 2;
     config.MIN_VELOCITY = 1;
-    config.NUM_BOIDS = 15;
-    config.LOCAL_BOUNDS = 50;
+    config.NUM_BOIDS = 200;
+    config.LOCAL_BOUNDS = 100;
+    config.SEPARATION_BOUNDS = 30;
+    config.WALL_BUFFER = 50;
 
     config.uid = 0; 
   }
 
   var canvas;
+  var ctx;
   var boids = [];
 
   function init() {
     canvas = $("#canvas");
+    ctx = getHtmlCanvas().getContext("2d");
+    window.ctx = ctx;
     config.CANVAS_WIDTH = canvas.width();
     config.CANVAS_HEIGHT = canvas.height();
+    ctx.translate(0, config.CANVAS_HEIGHT);
+    ctx.scale(1, -1);
 
     window.onresize();
 
     // Add boids
     for (var i = 0; i < config.NUM_BOIDS; i++) {
-      addBoid();
+      addBoid(
+        Math.round(Math.random() * config.CANVAS_WIDTH),
+        Math.round(Math.random() * config.CANVAS_HEIGHT),
+        getRandomInt(config.MIN_VELOCITY, config.MAX_VELOCITY),
+        Math.round(Math.random() * 360));
     }
+    // addBoid(500, 200, 2, 45, false);
+    // addBoid(600, 200, 2, 70, false);
+    // addBoid(575, 200, 2, 35, false);
+    // addBoid(490, 200, 2, 1, true);
 
     window.requestAnimationFrame(step);
   }
@@ -37,13 +52,8 @@
     init();
   });
 
-  function addBoid() {
-    boids.push(
-      new Boid(
-        Math.round(Math.random() * config.CANVAS_WIDTH),
-        Math.round(Math.random() * config.CANVAS_HEIGHT),
-        getRandomInt(config.MIN_VELOCITY, config.MAX_VELOCITY),
-        Math.round(Math.random() * 360)));
+  function addBoid(x, y, maxVelocity, direction, debug) {
+    boids.push(new Boid(x, y, maxVelocity, direction, debug));
   }
 
   function getHtmlCanvas() {
@@ -51,19 +61,17 @@
   }
 
   function step() {
-    var canvas_context = getHtmlCanvas().getContext("2d");
-    canvas_context.beginPath();
-    canvas_context.clearRect(0, 0, config.CANVAS_WIDTH, config.CANVAS_HEIGHT);
+    ctx.beginPath();
+    ctx.clearRect(0, 0, config.CANVAS_WIDTH, config.CANVAS_HEIGHT);
+    ctx.stroke();
 
     for (var i = 0; i < boids.length; i++) {
       boids[i].step(boids);
     }
 
-    canvas_context.fillStyle = "#fff";
     for (var i = 0; i < boids.length; i++) {
-      boids[i].draw(canvas_context);
+      boids[i].draw(ctx);
     }
-    canvas_context.stroke();
 
     window.requestAnimationFrame(step);
   }
@@ -74,6 +82,10 @@
 
   Math.radians = function(degrees) {
     return degrees * Math.PI / 180;
+  };
+
+  Math.degrees = function(radians) {
+    return radians * 180 / Math.PI;
   };
 
   function getRandomInt(min, max) {

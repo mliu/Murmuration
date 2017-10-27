@@ -1,47 +1,36 @@
 (function() {
   'use strict';
 
-  function Boid(initX, initY, maxVelocity, initDirection, debug) {
+  function Boid(initX, initY, velocity, initDirection, fillStyle, debug) {
     this.x = initX;
     this.y = initY;
-    this.velocity = maxVelocity;
-    this.direction = initDirection;
+    this.velocity = velocity;
+    this.direction = Math.radians(initDirection);
+    this.velocityInputs = [];
     this.uid = window.config.uid++;
-    this.maxVelocity = maxVelocity;
-    this.fillStyle = "#fff";
-
+    this.strokeStyle = debug ? "#1b51d1" : "#000";
+    this.fillStyle = debug ? "#1b51d1" : fillStyle;
     this.debug = debug;
   }
   window.Boid = Boid;
 
-  Boid.prototype.steerTowards = function(dir, steer) {
-    if (steer <= 0)
-      return;
-    if (dir < 0)
-      dir += 360;
-
-    if (this.direction < dir) {
-      this.direction += steer;
-    } else if (this.direction > dir) {
-      this.direction -= steer;
-    }
-
-    this.direction %= 360;
-  }
-
   // Boids will steer in the same direction as their flockmates
   Boid.prototype.addAlignment = function(flock) {
-    var alignment = this.direction;
+    var alignment = { x: Math.cos(this.direction), y: Math.sin(this.direction) };
     for (var i = 0; i < flock.length; i++) {
-      alignment += flock[i].direction;
+      alignment.x += Math.cos(flock[i].direction);
+      alignment.y += Math.sin(flock[i].direction);
     }
 
-    alignment = Math.round(alignment / (flock.length + 1));
+    var dir = Math.atan2(alignment.y, alignment.x);
 
-    this.steerTowards(alignment, 1);
+    this.velocityInputs.push({
+      value: dir,
+      weight: 1,
+    });
   }
 
-  // Boobs will move along with their flockmates
+  // Boids will move along with their flockmates
   Boid.prototype.addCohesion = function(flock) {
     var cohesion = { x: this.x, y: this.y };
     for (var i = 0; i < flock.length; i++) {
@@ -49,92 +38,131 @@
       cohesion.y += flock[i].y;
     }
 
-    cohesion.x = Math.round(cohesion.x / (flock.length + 1));
-    cohesion.y = Math.round(cohesion.y / (flock.length + 1));
+    cohesion.x = cohesion.x / (flock.length + 1);
+    cohesion.y = cohesion.y / (flock.length + 1);
 
     // Calculate angle
-    var dir = Math.degrees(Math.atan2(cohesion.y - this.y, cohesion.x - this.x));
+    var dir = Math.atan2(cohesion.y - this.y, cohesion.x - this.x);
 
-    this.steerTowards(dir, 3);
+    if (this.debug) {
+      ctx.fillRect(cohesion.x, cohesion.y, 3,3);
+    }
+
+    this.velocityInputs.push({
+      value: dir,
+      weight: 1,
+    });
   }
 
   // Boids will move away from close flockmates
   Boid.prototype.addSeparation = function(flock) {
+    var separationVec = { x: this.x, y: this.y };
+    var boidsInCriticalSeparationThreshold = false;
+    var dir, weight;
     for (var i = 0; i < flock.length; i++) {
+      // Calculate angle facing away
+      dir = Math.atan2(this.y - flock[i].y, this.x - flock[i].x);
+
+      // Heavier weighting to boids closer
+      weight = config.LOCAL_BOUNDS / Math.sqrt(Math.pow(this.x - flock[i].x, 2) +
+        Math.pow(this.y - flock[i].y, 2));
+
       if (this.inBoundaries(flock[i], config.SEPARATION_BOUNDS)) {
-        // Calculate angle
-        var dir = (Math.degrees(Math.atan2(flock[i].y - this.y, flock[i].x - this.x)) + 180) % 360;
-
-        this.steerTowards(dir, 5);
+        boidsInCriticalSeparationThreshold = true;
       }
-    }
-  }
 
-  Boid.prototype.avoidWalls = function() {
-    var angle = { x: 0, y: 0 };
-    if (this.x > config.CANVAS_WIDTH - config.WALL_BUFFER) {
-      angle.x = -1;
-      // this.steerTowards(180, 3);
-      // this.steerTowards(180, this.x - config.CANVAS_WIDTH);
-    } else if (this.x < config.WALL_BUFFER) {
-      angle.x = 1;
-      // this.steerTowards(0, -this.x);
-    }
-    if (this.y > config.CANVAS_HEIGHT - config.WALL_BUFFER) {
-      angle.y = -1;
-      // this.steerTowards(270, this.y - config.CANVAS_HEIGHT);
-    } else if (this.y < config.WALL_BUFFER) {
-      angle.y = 1;
-      // this.steerTowards(90, -this.y);
+      separationVec.x += Math.cos(dir) * weight;
+      separationVec.y += Math.sin(dir) * weight;
     }
 
-    if (this.debug)
-      console.log(Math.degrees(Math.atan2(angle.y, angle.x)));
-    if (angle.x !== 0 || angle.y !== 0)
-      this.steerTowards(Math.degrees(Math.atan2(angle.y, angle.x)), 5);
+    dir = Math.atan2(separationVec.y - this.y, separationVec.x - this.x);
+
+    if (this.debug) {
+      ctx.fillRect(separationVec.x, separationVec.y, 5, 5);
+    }
+
+    this.velocityInputs.push({
+      value: dir,
+      weight: boidsInCriticalSeparationThreshold ? 3 : 1,
+    });
   }
 
   // Check if this boid is in the boundaries
   Boid.prototype.inBoundaries = function(boid, bounds) {
-    return Math.sqrt(Math.pow(this.x - boid.x, 2) + Math.pow(this.y - boid.y, 2)) < bounds
-      // (Math.degrees(Math.atan2(this.y - boid.y, this.x - boid.x)) > (-45 + this.direction) % 360 &&
-      //   Math.degrees(Math.atan2(this.y - boid.y, this.x - boid.x)) < (315 + this.direction) % 360);
+    return Math.sqrt(Math.pow(this.x - boid.x, 2) +
+      Math.pow(this.y - boid.y, 2)) < bounds
   }
 
   Boid.prototype.draw = function(ctx) {
     ctx.save();
     ctx.translate(this.x, this.y);
-    ctx.rotate(Math.radians(this.direction));
+    ctx.rotate(this.direction);
 
-    if (this.debug) {
-      ctx.strokeStyle = "#FF0000"
-    }
-
+    ctx.fillStyle = this.fillStyle;
+    ctx.strokeStyle = this.strokeStyle;
+    ctx.lineWidth = config.LINE_WIDTH;
     ctx.beginPath();
-    ctx.fillStyle = "#FFF";
-    // ctx.fillRect(-2, -2, 4, 4);
     ctx.moveTo(10, 0);
     ctx.lineTo(-5, -5);
     ctx.lineTo(-5, 5);
-    ctx.lineTo(10, 0);
-    ctx.stroke();
+    ctx.closePath();
+    if (config.LINE_WIDTH) {
+      ctx.stroke();
+    }
     ctx.fill();
-    
-    // ctx.beginPath();
-    // ctx.moveTo(0, 0);
-    // ctx.lineTo(Math.cos(Math.radians(-225)) * config.LOCAL_BOUNDS, Math.sin(Math.radians(-225)) * config.LOCAL_BOUNDS);
-    // ctx.moveTo(0, 0);
-    // ctx.lineTo(Math.cos(Math.radians(-135)) * config.LOCAL_BOUNDS, Math.sin(Math.radians(-135)) * config.LOCAL_BOUNDS);
-    // ctx.stroke();
 
-    // ctx.moveTo(0, 0);
-    // ctx.strokeStyle = this.fillStyle;
-    // ctx.beginPath();
-    // ctx.arc(0, 0, config.LOCAL_BOUNDS, 2 * Math.PI, false);
-    // ctx.arc(0, 0, config.SEPARATION_BOUNDS, 2 * Math.PI, false);
-    // ctx.stroke();
+    if (this.debug) {
+      ctx.lineWidth = 1;
+      ctx.strokeStyle = "#FF0000"
+      ctx.moveTo(0, 0);
+      ctx.beginPath();
+      ctx.arc(0, 0, config.LOCAL_BOUNDS, 2 * Math.PI, false);
+      ctx.stroke();
+    }
 
     ctx.restore();
+  }
+
+  Boid.prototype.log = function(input) {
+    if (this.debug) {
+      console.log(input);
+    }
+  }
+
+  Boid.prototype.resolveStep = function() {
+    // Compute sum vector of new directions
+    this.velocityInputs.push({
+      value: this.direction,
+      weight: 5,
+    });
+    if (this.velocityInputs.length) {
+      var finalizedDestinationVec = { x: 0, y: 0 };
+      this.velocityInputs.forEach(function(el) {
+        finalizedDestinationVec.x += Math.cos(el.value) * el.weight * 10;
+        finalizedDestinationVec.y += Math.sin(el.value) * el.weight * 10;
+      }, this);
+      this.direction =
+        Math.atan2(finalizedDestinationVec.y, finalizedDestinationVec.x);
+
+      if (this.debug) {
+        console.log(finalizedDestinationVec);
+        ctx.moveTo(this.x, this.y);
+        ctx.beginPath();
+        ctx.lineTo(this.x + finalizedDestinationVec.x, this.y + finalizedDestinationVec.y);
+        ctx.stroke();
+      }
+
+      this.velocityInputs = [];
+    }
+
+    this.x += Math.cos(this.direction) * this.velocity;
+    this.y += Math.sin(this.direction) * this.velocity;
+
+    // Catch out of bounds
+    if (this.x < -config.WALL_BUFFER) this.x = config.CANVAS_WIDTH+config.WALL_BUFFER;
+    if (this.y < -config.WALL_BUFFER) this.y = config.CANVAS_HEIGHT+config.WALL_BUFFER;
+    if (this.x > config.CANVAS_WIDTH+config.WALL_BUFFER) this.x = -config.WALL_BUFFER;
+    if (this.y > config.CANVAS_HEIGHT+config.WALL_BUFFER) this.y = -config.WALL_BUFFER;
   }
 
   Boid.prototype.step = function(boids) {
@@ -144,16 +172,9 @@
     });
 
     if (flock.length) {
-      this.fillStyle = "#00ff04";
       this.addAlignment(flock);
       this.addCohesion(flock);
       this.addSeparation(flock);
-    } else {
-      this.fillStyle = "#ff0000";
     }
-    this.avoidWalls();
-
-    this.x += Math.cos(Math.radians(this.direction)) * this.velocity;
-    this.y += Math.sin(Math.radians(this.direction)) * this.velocity;
   }
 })();

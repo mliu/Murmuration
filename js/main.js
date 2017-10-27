@@ -5,16 +5,17 @@
   if (!window.config) {
     window.config = {};
 
+    config.LINE_WIDTH = 1.5;
     config.CANVAS_WIDTH;
     config.CANVAS_HEIGHT;
     config.MAX_VELOCITY = 2;
-    config.MIN_VELOCITY = 1;
-    config.NUM_BOIDS = 200;
+    config.MIN_VELOCITY = 1.5;
+    config.NUM_BOIDS = 300;
     config.LOCAL_BOUNDS = 100;
-    config.SEPARATION_BOUNDS = 30;
-    config.WALL_BUFFER = 50;
+    config.SEPARATION_BOUNDS = 15;
+    config.WALL_BUFFER = 10;
 
-    config.uid = 0; 
+    config.uid = 0;
   }
 
   var canvas;
@@ -37,13 +38,20 @@
       addBoid(
         Math.round(Math.random() * config.CANVAS_WIDTH),
         Math.round(Math.random() * config.CANVAS_HEIGHT),
+        // config.MAX_VELOCITY,
         getRandomInt(config.MIN_VELOCITY, config.MAX_VELOCITY),
-        Math.round(Math.random() * 360));
+        Math.round(Math.random() * 360),
+        rgbToHex(
+          255,
+          Math.floor(Math.random() * 70 + 150),
+          Math.floor(Math.random() * 70 + 40),
+        ),
+        false);
     }
-    // addBoid(500, 200, 2, 45, false);
-    // addBoid(600, 200, 2, 70, false);
-    // addBoid(575, 200, 2, 35, false);
-    // addBoid(490, 200, 2, 1, true);
+    // addBoid(100, 100, config.MAX_VELOCITY, 35, false);
+    // addBoid(130, 140, config.MAX_VELOCITY, 35, false);
+    // addBoid(110, 120, config.MAX_VELOCITY, 35, false);
+    // addBoid(130, 110, config.MAX_VELOCITY, 35, false);
 
     window.requestAnimationFrame(step);
   }
@@ -60,6 +68,17 @@
     return canvas.get()[0];
   }
 
+  function rgbComponentToHex(c) {
+    var hex = c.toString(16);
+    return hex.length == 1 ? "0" + hex : hex;
+  }
+
+  function rgbToHex(r, g, b) {
+    return "#" + rgbComponentToHex(r) + rgbComponentToHex(g) +
+      rgbComponentToHex(b);
+  }
+  window.rgbToHex = rgbToHex;
+
   function step() {
     ctx.beginPath();
     ctx.clearRect(0, 0, config.CANVAS_WIDTH, config.CANVAS_HEIGHT);
@@ -70,11 +89,13 @@
     }
 
     for (var i = 0; i < boids.length; i++) {
+      boids[i].resolveStep();
       boids[i].draw(ctx);
     }
 
     window.requestAnimationFrame(step);
   }
+  window.Step = step;
 
   window.onresize = function() {
     // Do nothing
